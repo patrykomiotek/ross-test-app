@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rossmann - Produkt</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+
+  <main class="product-detail-container-h7k3" data-testid="product-detail-page">
+    <div id="product-content">
+      <div class="loading-spinner-k4m2"><div class="spinner-icon-r8t3"></div> Ładowanie produktu...</div>
+    </div>
+  </main>
+
+  <script src="js/products.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    var currentUser = requireAuth();
+    if (!currentUser) throw new Error("Not authenticated");
+
+    // Render navbar
+    document.getElementById("navbar-placeholder").innerHTML = renderNavbar("");
+
+    // Get product ID from URL
+    var params = new URLSearchParams(window.location.search);
+    var productId = params.get("id");
+
+    function renderProductDetail() {
+      var product = getProductById(productId);
+      if (!product) {
+        document.getElementById("product-content").innerHTML = '' +
+          '<div class="no-results-message-t5k8">' +
+            '<h3>Produkt nie znaleziony</h3>' +
+            '<p>Nie znaleziono produktu o podanym identyfikatorze.</p>' +
+            '<a href="dashboard.html" class="btn-primary-x7k2" style="display:inline-block;margin-top:16px;">Wróć do produktów</a>' +
+          '</div>';
+        return;
+      }
+
+      document.title = "Rossmann - " + product.name;
+
+      var initials = product.name.split(" ").map(function(w) { return w[0]; }).join("").substring(0, 2).toUpperCase();
+
+      // Price HTML
+      var priceHtml = product.originalPrice
+        ? '<span class="product-detail-price-original">' + formatPrice(product.originalPrice) + '</span> <span class="product-detail-price-current">' + formatPrice(product.price) + '</span>'
+        : '<span class="product-detail-price-current">' + formatPrice(product.price) + '</span>';
+
+      // Reviews HTML
+      var reviewsHtml = "";
+      if (product.reviews && product.reviews.length > 0) {
+        product.reviews.forEach(function(review) {
+          reviewsHtml += '' +
+            '<div class="review-card-t5r9" data-testid="review-card">' +
+              '<div class="review-header-w3k7">' +
+                '<span class="review-author-m2p5">' + review.author + '</span>' +
+                '<span class="review-date-r8t4">' + formatDate(review.date) + '</span>' +
+              '</div>' +
+              '<div class="review-stars-k5m2">' + renderStars(review.rating) + '</div>' +
+              '<p class="review-text-w7n3">' + review.text + '</p>' +
+            '</div>';
+        });
+      }
+
+      // Related products HTML
+      var related = getRelatedProducts(product.id, 3);
+      var relatedHtml = "";
+      related.forEach(function(rp) {
+        relatedHtml += renderProductCard(rp);
+      });
+
+      var stockInfo = product.inStock
+        ? '<span style="color:#065F46;font-weight:600;">&#10003; Dostępny</span>'
+        : '<span style="color:#DC2626;font-weight:600;">&#10007; Niedostępny</span>';
+
+      document.getElementById("product-content").innerHTML = '' +
+        '<button class="back-button-r5t3" onclick="history.back()" data-testid="back-button">' +
+          '&#8592; Powrót' +
+        '</button>' +
+
+        '<nav class="breadcrumb-nav-t4r8" data-testid="breadcrumb">' +
+          '<a href="dashboard.html">Produkty</a>' +
+          '<span class="breadcrumb-separator">/</span>' +
+          '<a href="dashboard.html">' + getCategoryDisplayName(product.category) + '</a>' +
+          '<span class="breadcrumb-separator">/</span>' +
+          '<span>' + product.name + '</span>' +
+        '</nav>' +
+
+        '<div class="product-detail-grid-w9m3">' +
+          '<div class="product-image-large-k5t2" style="background-color:' + product.color + '" data-testid="product-image">' +
+            '<span class="card-initials-w4r7">' + initials + '</span>' +
+          '</div>' +
+
+          '<div class="product-info-section-r3v7">' +
+            '<span class="category-badge-h2m6 category-' + product.category.toLowerCase() + '">' + getCategoryDisplayName(product.category) + '</span>' +
+            '<h1 class="product-detail-title-m8k4" data-testid="product-detail-name">' + product.name + '</h1>' +
+            '<div class="product-detail-rating-p5t2">' +
+              renderStars(product.rating) +
+              ' <span class="rating-value-m8k3">(' + product.rating + ' / 5 - ' + product.reviews.length + ' opinii)</span>' +
+            '</div>' +
+            '<div class="product-detail-price-section" data-testid="product-detail-price">' +
+              priceHtml +
+              '<div style="margin-top:8px;">' + stockInfo + '</div>' +
+            '</div>' +
+            '<p class="product-detail-description-w4k8" data-testid="product-description">' + product.description + '</p>' +
+            '<div class="quantity-selector-t7r2">' +
+              '<label for="quantity">Ilość:</label>' +
+              '<input type="number" id="quantity" class="quantity-input-m3k8" data-testid="quantity-input" value="1" min="1" max="99">' +
+            '</div>' +
+            '<button class="btn-primary-x7k2 product-detail-add-btn" data-testid="add-to-cart-detail" onclick="handleAddToCart()" ' + (product.inStock ? '' : 'disabled') + '>' +
+              (product.inStock ? 'Dodaj do koszyka' : 'Produkt niedostępny') +
+            '</button>' +
+          '</div>' +
+        '</div>' +
+
+        '<section class="reviews-section-k8m4" data-testid="reviews-section">' +
+          '<h2 class="section-title-d4f8">Opinie klientów (' + product.reviews.length + ')</h2>' +
+          reviewsHtml +
+        '</section>' +
+
+        (related.length > 0 ?
+          '<section class="related-section-p4k8" data-testid="related-products">' +
+            '<h2 class="section-title-d4f8">Podobne produkty</h2>' +
+            '<div class="related-grid-m7t3">' + relatedHtml + '</div>' +
+          '</section>'
+        : '');
+    }
+
+    function handleAddToCart() {
+      var qty = parseInt(document.getElementById("quantity").value) || 1;
+      if (qty < 1) qty = 1;
+      addToCart(parseInt(productId), qty);
+    }
+
+    // Simulate loading delay
+    setTimeout(function() {
+      renderProductDetail();
+    }, 600);
+  </script>
+</body>
+</html>

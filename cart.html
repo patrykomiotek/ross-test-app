@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rossmann - Koszyk</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+
+  <main class="cart-container-r5k8" data-testid="cart-page">
+    <h1 class="cart-title-m3t7">Koszyk</h1>
+    <div id="cart-content">
+      <div class="loading-spinner-k4m2"><div class="spinner-icon-r8t3"></div> Ładowanie koszyka...</div>
+    </div>
+  </main>
+
+  <script src="js/products.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    var currentUser = requireAuth();
+    if (!currentUser) throw new Error("Not authenticated");
+
+    // Render navbar
+    document.getElementById("navbar-placeholder").innerHTML = renderNavbar("cart");
+
+    function renderCart() {
+      var cart = getCart();
+      var container = document.getElementById("cart-content");
+
+      if (cart.length === 0) {
+        container.innerHTML = '' +
+          '<div class="empty-cart-state-m4r8" data-testid="empty-cart">' +
+            '<div class="empty-cart-icon-k7t3">&#128722;</div>' +
+            '<h2 class="empty-cart-title-r5m2">Twój koszyk jest pusty</h2>' +
+            '<p class="empty-cart-text-w3k8">Dodaj produkty do koszyka, aby kontynuować zakupy.</p>' +
+            '<a href="dashboard.html" class="btn-primary-x7k2" style="display:inline-block;" data-testid="continue-shopping-empty">Przejdź do produktów</a>' +
+          '</div>';
+        return;
+      }
+
+      // Build cart items
+      var itemsHtml = "";
+      var subtotal = 0;
+
+      cart.forEach(function(item) {
+        var product = getProductById(item.productId);
+        if (!product) return;
+
+        var itemTotal = product.price * item.quantity;
+        subtotal += itemTotal;
+
+        var initials = product.name.split(" ").map(function(w) { return w[0]; }).join("").substring(0, 2).toUpperCase();
+
+        itemsHtml += '' +
+          '<div class="cart-item-card-t7m3" data-testid="cart-item" data-product-id="' + product.id + '">' +
+            '<div class="cart-item-image-k5r2" style="background-color:' + product.color + '">' +
+              '<span class="card-initials-w4r7">' + initials + '</span>' +
+            '</div>' +
+            '<div class="cart-item-info-m8t4">' +
+              '<div class="cart-item-name-r3k7"><a href="product.html?id=' + product.id + '">' + product.name + '</a></div>' +
+              '<div class="cart-item-price-w5t9">' + formatPrice(product.price) + ' / szt.</div>' +
+            '</div>' +
+            '<div class="cart-item-quantity-p7k3" data-testid="cart-item-quantity">' +
+              '<button class="cart-qty-btn-r4m8" onclick="changeQuantity(' + product.id + ', -1)" data-testid="qty-decrease">-</button>' +
+              '<span class="cart-qty-value-t3k9" data-testid="qty-value">' + item.quantity + '</span>' +
+              '<button class="cart-qty-btn-r4m8" onclick="changeQuantity(' + product.id + ', 1)" data-testid="qty-increase">+</button>' +
+            '</div>' +
+            '<div class="cart-item-subtotal-m5r2" data-testid="cart-item-subtotal">' + formatPrice(itemTotal) + '</div>' +
+            '<button class="cart-item-remove-k8t4" onclick="handleRemove(' + product.id + ')" data-testid="remove-item" title="Usuń produkt">&#10005;</button>' +
+          '</div>';
+      });
+
+      // Shipping
+      var shippingCost = subtotal >= 50 ? 0 : 9.99;
+      var total = subtotal + shippingCost;
+
+      var shippingNote = subtotal >= 50
+        ? '<div class="free-shipping-note-k3r7" data-testid="free-shipping-note">&#10003; Darmowa dostawa!</div>'
+        : '<div class="free-shipping-note-k3r7" style="background:#FEF3C7;color:#92400E;" data-testid="shipping-threshold-note">Dodaj jeszcze ' + formatPrice(50 - subtotal) + ' do darmowej dostawy</div>';
+
+      container.innerHTML = '' +
+        '<div class="cart-layout-w9k2">' +
+          '<div class="cart-items-list-p4r8" data-testid="cart-items-list">' +
+            itemsHtml +
+          '</div>' +
+          '<div class="cart-summary-card-w7m3" data-testid="cart-summary">' +
+            '<h2 class="cart-summary-title-r4k8">Podsumowanie</h2>' +
+            shippingNote +
+            '<div class="cart-summary-row-t5m2">' +
+              '<span class="cart-summary-label">Produkty:</span>' +
+              '<span class="cart-summary-value" data-testid="summary-subtotal">' + formatPrice(subtotal) + '</span>' +
+            '</div>' +
+            '<div class="cart-summary-row-t5m2">' +
+              '<span class="cart-summary-label">Dostawa:</span>' +
+              '<span class="cart-summary-value" data-testid="summary-shipping">' + (shippingCost === 0 ? 'Gratis' : formatPrice(shippingCost)) + '</span>' +
+            '</div>' +
+            '<div class="cart-summary-row-t5m2 total">' +
+              '<span>Razem:</span>' +
+              '<span data-testid="summary-total">' + formatPrice(total) + '</span>' +
+            '</div>' +
+            '<div class="cart-summary-buttons">' +
+              '<button class="btn-primary-x7k2" onclick="handleCheckout()" data-testid="checkout-button">Przejdź do kasy</button>' +
+              '<a href="dashboard.html" class="btn-secondary-m4r8" data-testid="continue-shopping">Kontynuuj zakupy</a>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    }
+
+    function changeQuantity(productId, delta) {
+      var cart = getCart();
+      var item = cart.find(function(i) { return i.productId === productId; });
+      if (!item) return;
+
+      var newQty = item.quantity + delta;
+      if (newQty < 1) {
+        handleRemove(productId);
+        return;
+      }
+      item.quantity = newQty;
+      saveCart(cart);
+      updateCartBadge();
+      renderCart();
+    }
+
+    function handleRemove(productId) {
+      removeFromCart(productId);
+      renderCart();
+      showToast("Produkt usunięty z koszyka");
+    }
+
+    function handleCheckout() {
+      var orderNumber = "RM-" + Date.now().toString(36).toUpperCase();
+      showModal(
+        "Zamówienie złożone!",
+        '<div class="success-checkmark-container">' +
+          '<div class="success-checkmark-icon">&#10004;</div>' +
+          '<h3 style="margin-bottom:8px;">Dziękujemy za zakupy!</h3>' +
+          '<p style="color:#6B7280;margin-bottom:16px;">Twoje zamówienie zostało przyjęte do realizacji.</p>' +
+          '<p>Numer zamówienia: <span class="success-order-number" data-testid="order-number">' + orderNumber + '</span></p>' +
+        '</div>'
+      );
+      clearCart();
+      setTimeout(function() {
+        renderCart();
+      }, 300);
+    }
+
+    // Simulate loading delay
+    setTimeout(function() {
+      renderCart();
+    }, 500);
+  </script>
+</body>
+</html>
