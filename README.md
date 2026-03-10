@@ -7,6 +7,13 @@ Symulacja prostego sklepu internetowego z produktami drogeryjnymi, zbudowana w c
 ## Uruchomienie
 
 ```bash
+git clone https://github.com/patrykomiotek/ross-test-app
+cd ross-test-app
+npm install
+npm run start
+```
+
+```bash
 npx serve . -l 8080
 ```
 
